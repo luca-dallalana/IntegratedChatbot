@@ -945,7 +945,7 @@ class EnhancedModelManager:
         self.client = openai.OpenAI(api_key=api_key)
         self.available_models = {
             'gpt-4o-mini': 'gpt-4o-mini',
-            'gpt-4o-nano': 'gpt-4o-nano'  # Updated to use GPT-4 nano instead of 3.5-turbo
+            'gpt-4.1-nano': 'gpt-4.1-nano'  # Updated to use GPT-4 nano instead of 3.5-turbo
         }
         self.test_suite = InvestmentTestSuite()
         self.evaluator = InvestmentModelEvaluator()

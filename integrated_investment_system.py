@@ -1,8 +1,12 @@
-# integrated_investment_system.py
+# integrated_investment_system.py - Fixed Complete System
 import asyncio
 import json
 import re
 import time
+import os
+import tempfile
+import webbrowser
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Any, Optional, Tuple
@@ -18,7 +22,6 @@ from plotly.subplots import make_subplots
 import openai
 from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -47,20 +50,6 @@ class InvestmentTestSuite:
         self.prompt_variations = []
         self._load_test_cases()
         self._load_prompt_variations()
-        
-        # Pattern-based matching for common investment concepts
-        self.patterns = {
-            "diversification": r"diversif(y|ication)|spread.*risk|multiple.*asset",
-            "expense_ratio": r"expense\s+ratio|management\s+fee|fund\s+fee",
-            "risk_vs_return": r"risk.*return|return.*risk|risk[-\s]?adjusted",
-            "volatility": r"volatil|fluctuat|price.*swing",
-            "allocation": r"allocat.*portfolio|asset.*mix|weighting",
-            "bond_yield": r"bond.*yield|coupon.*rate|fixed\s+income",
-            "crypto_security": r"wallet|private\s+key|cold\s+storage|exchange\s+risk",
-            "tax_implications": r"tax|capital\s+gain|tax[-\s]?advantaged",
-            "cash_flow": r"cash\s+flow|income\s+stream|dividend|interest.*payment",
-            "withdrawal_rate": r"withdrawal.*rate|safe.*withdrawal|4%\s+rule"
-        }
 
     def _load_test_cases(self):
         """Load investment-specific test cases."""
@@ -187,101 +176,18 @@ class InvestmentTestSuite:
     def _load_prompt_variations(self):
         """Load investment advisor prompt variations for testing."""
         self.prompt_variations = [
-            """You are a professional investment advisor. A client has approached you with the following information:
-
-Client Income: {client_income}
-Investment Goal: {investment_goal}
-Risk Tolerance: {risk_tolerance}
-Time Horizon: {time_horizon}
-Available Investment: {investment_amount}
-Preferred Assets: {preferred_assets}
-
-Please provide comprehensive investment advice including allocation strategies, risk management, and next steps.""",
-
-            """As an experienced financial consultant, I want to help you navigate your investment journey. Based on your profile:
-
-• Annual Income: {client_income}
-• Investment Goal: {investment_goal}
-• Risk Tolerance: {risk_tolerance}
-• Time Horizon: {time_horizon}
-• Available Capital: {investment_amount}
-• Preferred Assets: {preferred_assets}
-
-Let me provide you with a detailed analysis of your options, probability of success, and strategic recommendations.""",
-
-            """Hi there! I'm excited to help you with your investments. Let's review your situation:
-
-Income: {client_income}
-Goal: {investment_goal}
-Risk profile: {risk_tolerance}
-Timeline: {time_horizon}
-Investment amount: {investment_amount}
-Interested in: {preferred_assets}
-
-I'll walk you through potential strategies, explain how different asset classes fit, and outline what steps we should take to move forward."""
+            """You are a professional investment advisor. Please provide comprehensive investment advice including allocation strategies, risk management, and next steps.""",
+            
+            """As an experienced financial consultant, I want to help you navigate your investment journey. Let me provide you with a detailed analysis of your options, probability of success, and strategic recommendations.""",
+            
+            """Hi there! I'm excited to help you with your investments. I'll walk you through potential strategies, explain how different asset classes fit, and outline what steps we should take to move forward."""
         ]
-
-    def check_validation_criterion(self, response: str, criterion: str, expected: Any) -> bool:
-        """Check if a specific investment validation criterion is met."""
-        response_lower = response.lower()
-        
-        # Boolean criteria
-        if isinstance(expected, bool):
-            criterion_patterns = {
-                "mentions_diversification": r"diversif|spread.*risk|multiple.*asset",
-                "explains_fees": r"expense\s+ratio|fund\s+fee|management\s+fee",
-                "analyzes_risk_return": r"risk.*return|return.*risk|risk[-\s]?adjusted",
-                "mentions_volatility": r"volatil|fluctuat|market.*swing",
-                "discusses_security": r"wallet|private\s+key|secure.*crypto",
-                "explains_regulations": r"regulat|sec|compliance|oversight",
-                "mentions_bond_types": r"treasury|municipal|corporate\s+bond",
-                "explains_yields": r"yield|coupon\s+rate|interest.*bond",
-                "discusses_interest_risks": r"interest\s+rate\s+risk|duration\s+risk",
-                "addresses_income_variability": r"irregular\s+income|variable\s+income|unstable\s+earnings",
-                "mentions_emergency_fund": r"emergency\s+fund|cash\s+reserve|rainy\s+day",
-                "discusses_rebalancing": r"rebalance|adjust.*portfolio|realign.*assets",
-                "mentions_allocation": r"allocation|asset\s+mix|diversif.*portfolio",
-                "explains_tax_strategies": r"tax\s+efficien|tax[-\s]?advant|capital\s+gain",
-                "discusses_risks": r"risk|volatil|uncertain|downside",
-                "mentions_savings_rate": r"saving\s+rate|save\s+%|high\s+savings",
-                "explains_withdrawal_strategies": r"withdrawal\s+rate|safe\s+withdrawal|4%\s+rule",
-                "discusses_tradeoffs": r"trade[-\s]?off|sacrifice|balanc.*goal"
-            }
-            
-            if criterion in criterion_patterns:
-                pattern = criterion_patterns[criterion]
-                return bool(re.search(pattern, response_lower))
-        
-        # String criteria (check if string is mentioned)
-        elif isinstance(expected, str):
-            return expected.lower() in response_lower
-            
-        return False
-
-    def calculate_jargon_penalty(self, response: str) -> float:
-        """Calculate penalty for excessive financial jargon use."""
-        jargon_terms = [
-            'alpha', 'beta', 'sharpe ratio', 'standard deviation', 'liquidity crunch',
-            'derivative', 'hedging', 'leverage', 'arbitrage', 'market capitalization',
-            'price-to-earnings', 'yield curve', 'basis points', 'quantitative easing'
-        ]
-        
-        response_lower = response.lower()
-        word_count = len(response.split())
-        jargon_count = sum(1 for term in jargon_terms if term in response_lower)
-        
-        if word_count == 0:
-            return 0.0
-            
-        jargon_ratio = jargon_count / word_count
-        return min(0.5, jargon_ratio * 10)  # Cap at 50% penalty
 
 # Enhanced Model Evaluator with Advanced Scoring
 class InvestmentModelEvaluator:
     """Advanced evaluator for investment advisor responses with comprehensive metrics."""
     
     def __init__(self):
-        self.test_suite = InvestmentTestSuite()
         self.evaluation_criteria = {
             'accuracy': 0.30,
             'completeness': 0.25,
@@ -426,8 +332,6 @@ class InvestmentModelEvaluator:
     
     async def _score_helpfulness(self, response: str, test_case: Dict) -> float:
         """Score how helpful the response is."""
-        score = 0.5
-        
         # Check for actionable advice
         actionable_indicators = [
             'should', 'recommend', 'suggest', 'next step', 'consider', 'contact',
@@ -483,20 +387,6 @@ class InvestmentModelEvaluator:
         if found_indicators == 0:
             score -= 0.2
         
-        # Check for proper grammar (simple heuristics)
-        grammar_issues = 0
-        
-        # Check for consistent capitalization
-        sentences = re.split(r'[.!?]+', response)
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if sentence and not sentence[0].isupper():
-                grammar_issues += 1
-        
-        # Penalize excessive grammar issues
-        if grammar_issues > len(sentences) * 0.1:
-            score -= 0.1
-        
         return min(1.0, max(0.0, score))
     
     def _contains_element(self, response: str, element: str) -> bool:
@@ -509,44 +399,18 @@ class InvestmentModelEvaluator:
         """Calculate readability score (Flesch Reading Ease approximation)."""
         sentences = len(re.findall(r'[.!?]+', text))
         words = len(text.split())
-        syllables = sum(self._count_syllables(word) for word in text.split())
         
         if sentences == 0 or words == 0:
             return 50.0  # Neutral score
         
-        # Simplified Flesch Reading Ease
+        # Simplified readability calculation
         avg_sentence_length = words / sentences
-        avg_syllables_per_word = syllables / words
-        
-        score = 206.835 - (1.015 * avg_sentence_length) - (84.6 * avg_syllables_per_word)
-        return max(0, min(100, score))
-    
-    def _count_syllables(self, word: str) -> int:
-        """Estimate syllables in a word."""
-        word = word.lower().strip()
-        if not word:
-            return 0
-        
-        vowels = 'aeiouy'
-        syllable_count = 0
-        prev_was_vowel = False
-        
-        for char in word:
-            is_vowel = char in vowels
-            if is_vowel and not prev_was_vowel:
-                syllable_count += 1
-            prev_was_vowel = is_vowel
-        
-        # Handle silent e
-        if word.endswith('e'):
-            syllable_count -= 1
-        
-        return max(1, syllable_count)
+        score = max(0, min(100, 100 - (avg_sentence_length - 15) * 2))
+        return score
     
     def _analyze_structure(self, text: str) -> Dict[str, Any]:
         """Analyze the structure of the response."""
         paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
-        sentences = re.split(r'[.!?]+', text)
         
         structure = {
             "has_introduction": len(paragraphs) > 0 and len(paragraphs[0]) > 50,
@@ -654,15 +518,9 @@ class InvestmentModelEvaluator:
                 "mentions_bond_types": r"treasury|municipal|corporate\s+bond",
                 "explains_yields": r"yield|coupon\s+rate|interest.*bond",
                 "discusses_interest_risks": r"interest\s+rate\s+risk|duration\s+risk",
-                "addresses_income_variability": r"irregular\s+income|variable\s+income|unstable\s+earnings",
-                "mentions_emergency_fund": r"emergency\s+fund|cash\s+reserve|rainy\s+day",
-                "discusses_rebalancing": r"rebalance|adjust.*portfolio|realign.*assets",
                 "mentions_allocation": r"allocation|asset\s+mix|diversif.*portfolio",
                 "explains_tax_strategies": r"tax\s+efficien|tax[-\s]?advant|capital\s+gain",
-                "discusses_risks": r"risk|volatil|uncertain|downside",
-                "mentions_savings_rate": r"saving\s+rate|save\s+%|high\s+savings",
-                "explains_withdrawal_strategies": r"withdrawal\s+rate|safe\s+withdrawal|4%\s+rule",
-                "discusses_tradeoffs": r"trade[-\s]?off|sacrifice|balanc.*goal"
+                "discusses_risks": r"risk|volatil|uncertain|downside"
             }
             
             if criterion in criterion_patterns:
@@ -698,222 +556,15 @@ class InvestmentModelEvaluator:
         if not scores:
             return 0.0
         
-        # Weight different criteria
-        weights = {
-            "accuracy": 0.3,
-            "completeness": 0.25,
-            "helpfulness": 0.2,
-            "clarity": 0.15,
-            "relevance": 0.05,
-            "professionalism": 0.05
-        }
-        
         weighted_sum = 0.0
         total_weight = 0.0
         
         for criterion, score in scores.items():
-            weight = weights.get(criterion, 0.1)  # Default weight for unknown criteria
+            weight = self.evaluation_criteria.get(criterion, 0.1)
             weighted_sum += score * weight
             total_weight += weight
         
         return weighted_sum / total_weight if total_weight > 0 else 0.0
-        vowels = 'aeiouy'
-        syllable_count = 0
-        prev_was_vowel = False
-        
-        for char in word:
-            is_vowel = char in vowels
-            if is_vowel and not prev_was_vowel:
-                syllable_count += 1
-            prev_was_vowel = is_vowel
-        
-        # Handle silent e
-        if word.endswith('e'):
-            syllable_count -= 1
-        
-        return max(1, syllable_count)
-    
-    def _analyze_structure(self, text: str) -> Dict[str, Any]:
-        """Analyze the structure of the response."""
-        paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
-        sentences = re.split(r'[.!?]+', text)
-        
-        structure = {
-            "has_introduction": len(paragraphs) > 0 and len(paragraphs[0]) > 50,
-            "has_conclusion": len(paragraphs) > 1 and any(word in paragraphs[-1].lower() 
-                                                        for word in ['summary', 'conclusion', 'overall', 'finally']),
-            "has_bullet_points": '•' in text or re.search(r'^\s*[-*]\s', text, re.MULTILINE),
-            "has_numbered_list": re.search(r'^\s*\d+\.', text, re.MULTILINE),
-            "paragraph_count": len(paragraphs),
-            "paragraph_balance": "balanced" if 2 <= len(paragraphs) <= 5 else "unbalanced"
-        }
-        
-        return structure
-    
-    async def _analyze_topic_relevance(self, response: str, test_case: Dict) -> Dict[str, Any]:
-        """Analyze how relevant the response is to the investment topic."""
-        # Investment-specific keywords by category
-        investment_keywords = {
-            'general': ['investment', 'portfolio', 'risk', 'return', 'market'],
-            'instruments': ['stock', 'bond', 'etf', 'fund', 'crypto', 'reit'],
-            'strategies': ['diversification', 'allocation', 'rebalancing', 'dollar-cost'],
-            'metrics': ['yield', 'dividend', 'expense ratio', 'volatility']
-        }
-        
-        response_lower = response.lower()
-        relevance_score = 0.0
-        category_scores = {}
-        
-        for category, keywords in investment_keywords.items():
-            found_keywords = sum(1 for keyword in keywords if keyword in response_lower)
-            category_score = min(1.0, found_keywords / len(keywords))
-            category_scores[category] = category_score
-            relevance_score += category_score
-        
-        # Normalize by number of categories
-        relevance_score = relevance_score / len(investment_keywords)
-        
-        return {
-            "score": relevance_score,
-            "category_scores": category_scores
-        }
-    
-    async def _calculate_metrics(self, response: str, test_case: Dict) -> Dict[str, Any]:
-        """Calculate additional metrics for the response."""
-        metrics = {
-            "token_count": len(response.split()),
-            "character_count": len(response),
-            "readability_score": self._calculate_readability(response),
-            "complexity_score": self._calculate_complexity_score(response, test_case),
-            "coverage_score": self._calculate_coverage_score(response, test_case),
-            "jargon_penalty": self._calculate_jargon_penalty(response)
-        }
-        
-        return metrics
-    
-    def _calculate_complexity_score(self, response: str, test_case: Dict) -> float:
-        """Calculate how well the response handles complexity."""
-        difficulty = test_case.get("difficulty", 1)
-        
-        # Expected complexity indicators based on difficulty
-        complexity_indicators = [
-            r'however', r'although', r'consider', r'depending', r'various',
-            r'multiple', r'complex', r'several', r'different', r'alternative'
-        ]
-        
-        response_lower = response.lower()
-        complexity_count = sum(1 for pattern in complexity_indicators if re.search(pattern, response_lower))
-        
-        # Score based on difficulty appropriateness
-        expected_complexity = difficulty * 2
-        if complexity_count >= expected_complexity:
-            return 1.0
-        else:
-            return complexity_count / expected_complexity if expected_complexity > 0 else 0.5
-    
-    def _check_validation_criterion(self, response: str, criterion: str, expected: Any) -> bool:
-        """Check if a specific investment validation criterion is met."""
-        response_lower = response.lower()
-        
-        # Boolean criteria
-        if isinstance(expected, bool):
-            criterion_patterns = {
-                "mentions_diversification": r"diversif|spread.*risk|multiple.*asset",
-                "explains_fees": r"expense\s+ratio|fund\s+fee|management\s+fee",
-                "analyzes_risk_return": r"risk.*return|return.*risk|risk[-\s]?adjusted",
-                "mentions_volatility": r"volatil|fluctuat|market.*swing",
-                "discusses_security": r"wallet|private\s+key|secure.*crypto",
-                "explains_regulations": r"regulat|sec|compliance|oversight",
-                "mentions_bond_types": r"treasury|municipal|corporate\s+bond",
-                "explains_yields": r"yield|coupon\s+rate|interest.*bond",
-                "discusses_interest_risks": r"interest\s+rate\s+risk|duration\s+risk",
-                "addresses_income_variability": r"irregular\s+income|variable\s+income|unstable\s+earnings",
-                "mentions_emergency_fund": r"emergency\s+fund|cash\s+reserve|rainy\s+day",
-                "discusses_rebalancing": r"rebalance|adjust.*portfolio|realign.*assets",
-                "mentions_allocation": r"allocation|asset\s+mix|diversif.*portfolio",
-                "explains_tax_strategies": r"tax\s+efficien|tax[-\s]?advant|capital\s+gain",
-                "discusses_risks": r"risk|volatil|uncertain|downside",
-                "mentions_savings_rate": r"saving\s+rate|save\s+%|high\s+savings",
-                "explains_withdrawal_strategies": r"withdrawal\s+rate|safe\s+withdrawal|4%\s+rule",
-                "discusses_tradeoffs": r"trade[-\s]?off|sacrifice|balanc.*goal"
-            }
-            
-            if criterion in criterion_patterns:
-                pattern = criterion_patterns[criterion]
-                return bool(re.search(pattern, response_lower))
-        
-        # String criteria (check if string is mentioned)
-        elif isinstance(expected, str):
-            return expected.lower() in response_lower
-        
-        return False
-    
-    def _calculate_jargon_penalty(self, response: str) -> float:
-        """Calculate penalty for excessive financial jargon use."""
-        jargon_terms = [
-            'alpha', 'beta', 'sharpe ratio', 'standard deviation', 'liquidity crunch',
-            'derivative', 'hedging', 'leverage', 'arbitrage', 'market capitalization',
-            'price-to-earnings', 'yield curve', 'basis points', 'quantitative easing'
-        ]
-        
-        response_lower = response.lower()
-        word_count = len(response.split())
-        jargon_count = sum(1 for term in jargon_terms if term in response_lower)
-        
-        if word_count == 0:
-            return 0.0
-        
-        jargon_ratio = jargon_count / word_count
-        return min(0.5, jargon_ratio * 10)  # Cap at 50% penalty
-    
-    def _calculate_overall_score(self, scores: Dict[str, float]) -> float:
-        """Calculate overall score from individual criterion scores."""
-        if not scores:
-            return 0.0
-        
-        # Weight different criteria
-        weights = {
-            "accuracy": 0.3,
-            "completeness": 0.25,
-            "helpfulness": 0.2,
-            "clarity": 0.15,
-            "relevance": 0.05,
-            "professionalism": 0.05
-        }
-        
-        weighted_sum = 0.0
-        total_weight = 0.0
-        
-        for criterion, score in scores.items():
-            weight = weights.get(criterion, 0.1)  # Default weight for unknown criteria
-            weighted_sum += score * weight
-            total_weight += weight
-        
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
-    
-    def _calculate_coverage_score(self, response: str, test_case: Dict) -> float:
-        """Calculate how well the response covers the test case variables."""
-        variables = test_case.get("variables", {})
-        if not variables:
-            return 1.0
-        
-        response_lower = response.lower()
-        covered_variables = 0
-        
-        for key, value in variables.items():
-            value_str = str(value).lower()
-            # Check if the variable value or related terms appear in response
-            if value_str in response_lower or any(word in response_lower for word in value_str.split()):
-                covered_variables += 1
-        
-        return covered_variables / len(variables)
-    
-    def calculate_overall_score(self, scores: Dict[str, float]) -> float:
-        """Calculate weighted overall score."""
-        overall = sum(scores[criterion] * weight 
-                     for criterion, weight in self.evaluation_criteria.items()
-                     if criterion in scores)
-        return round(overall, 2)
 
 # Enhanced API Models
 class ModelComparisonRequest(BaseModel):
@@ -945,7 +596,7 @@ class EnhancedModelManager:
         self.client = openai.OpenAI(api_key=api_key)
         self.available_models = {
             'gpt-4o-mini': 'gpt-4o-mini',
-            'gpt-4.1-nano': 'gpt-4.1-nano'  # Updated to use GPT-4 nano instead of 3.5-turbo
+            'gpt-4.1-nano': 'gpt-4.1-nano'
         }
         self.test_suite = InvestmentTestSuite()
         self.evaluator = InvestmentModelEvaluator()
@@ -977,7 +628,7 @@ class EnhancedModelManager:
             prompt_variation = 0
         
         prompt_template = self.test_suite.prompt_variations[prompt_variation]
-        formatted_prompt = prompt_template.format(**test_case.variables)
+        formatted_prompt = f"{prompt_template}\n\nClient situation: {test_case.variables}"
         
         # Get responses from all models
         results = {}
@@ -1038,13 +689,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve the HTML file
-@app.get("/", response_class=HTMLResponse)
-async def serve_chatbot():
-    """Serve the investment chatbot HTML."""
-    with open("investmentChatBot.html", "r", encoding="utf-8") as f:
-        html_content = f.read()
-    return HTMLResponse(content=html_content)
+@app.get("/")
+async def root():
+    return {
+        "message": "Investment Chatbot Comparison API",
+        "version": "2.0.0",
+        "available_models": ["gpt-4o-mini", "gpt-4.1-nano"],
+        "endpoints": ["/test-cases", "/compare-models", "/health"]
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/test-cases")
 async def get_test_cases():
@@ -1091,13 +747,572 @@ def create_streamlit_app():
     st.title("💰 Investment Chatbot Model Comparison")
     st.markdown("Compare AI models on investment advisory scenarios")
     
-    # Sidebar
+    # Sidebar navigation
+    st.sidebar.header("Navigation")
+    page = st.sidebar.selectbox(
+        "Select Mode:",
+        ["Standard Test Cases", "Real-Time Dual Chatbot"]
+    )
+    
+    # Sidebar configuration
     st.sidebar.header("Configuration")
     api_key = st.sidebar.text_input("OpenAI API Key", type="password")
     
     if not api_key:
         st.warning("Enter your OpenAI API key to begin")
         return
+    
+    if page == "Real-Time Dual Chatbot":
+        create_dual_chatbot_interface(api_key)
+    else:
+        create_standard_comparison_interface(api_key)
+
+def create_dual_chatbot_interface(api_key: str):
+    """Create the dual chatbot comparison interface."""
+    
+    st.header("Real-Time Dual Chatbot Comparison")
+    st.markdown("Select a prompt style, launch dual chatbots, and compare responses in real-time.")
+    
+    # Initialize session state for dual chatbot
+    if 'chatbot_sessions' not in st.session_state:
+        st.session_state.chatbot_sessions = {}
+    
+    # Prompt style selection
+    st.subheader("1. Select Prompt Style")
+    
+    prompt_descriptions = [
+        "Professional - Formal, comprehensive investment advice with detailed analysis",
+        "Consultative - Structured approach with bullet points and strategic recommendations", 
+        "Friendly - Conversational, approachable tone with step-by-step guidance"
+    ]
+    
+    selected_prompt_style = st.selectbox(
+        "Choose the prompt style for both models:",
+        options=[0, 1, 2],
+        format_func=lambda x: prompt_descriptions[x]
+    )
+    
+    # Show selected prompt
+    test_suite = InvestmentTestSuite()
+    
+    with st.expander("Preview Selected Prompt"):
+        st.write(test_suite.prompt_variations[selected_prompt_style])
+    
+    # Model selection
+    st.subheader("2. Model Configuration")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        model1 = st.selectbox("Model 1:", ["gpt-4o-mini", "gpt-4.1-nano"], index=0)
+    
+    with col2:
+        model2 = st.selectbox("Model 2:", ["gpt-4o-mini", "gpt-4.1-nano"], index=1)
+    
+    if model1 == model2:
+        st.error("Please select different models for comparison.")
+        return
+    
+    # Launch dual chatbots
+    st.subheader("3. Launch Dual Chatbots")
+    
+    if st.button("Launch Dual Chatbot Interface", type="primary"):
+        # Generate session ID
+        session_id = str(uuid.uuid4())[:8]
+        
+        # Create HTML content for dual chatbots
+        html_content = create_dual_chatbot_html(session_id, model1, model2, selected_prompt_style, api_key, test_suite.prompt_variations[selected_prompt_style])
+        
+        # Save to temporary file and open
+        temp_dir = tempfile.gettempdir()
+        html_file = os.path.join(temp_dir, f"dual_chatbot_{session_id}.html")
+        
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # Store session info
+        st.session_state.current_session = {
+            'id': session_id,
+            'models': [model1, model2],
+            'prompt_style': selected_prompt_style,
+            'html_file': html_file
+        }
+        
+        # Open in browser
+        file_url = f"file://{html_file}"
+        webbrowser.open(file_url)
+        
+        st.success(f"Dual chatbot interface launched! Session ID: {session_id}")
+        st.info("The chatbot interface opened in your browser. Send the same message to both models, then return here for analysis.")
+    
+    # Analysis section
+    st.subheader("4. Response Analysis")
+    
+    if 'current_session' in st.session_state:
+        session_info = st.session_state.current_session
+        st.write(f"Active Session: {session_info['id']}")
+        
+        # Manual response input for analysis
+        st.write("Enter the responses from both models:")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write(f"**{session_info['models'][0]} Response:**")
+            response1 = st.text_area("Response 1:", height=200, key="resp1")
+        
+        with col2:
+            st.write(f"**{session_info['models'][1]} Response:**")
+            response2 = st.text_area("Response 2:", height=200, key="resp2")
+        
+        user_prompt = st.text_input("User Question:", placeholder="Enter the question you asked both models")
+        
+        if st.button("Analyze Responses", type="primary"):
+            if response1 and response2 and user_prompt:
+                analyze_dual_responses(
+                    response1, response2, 
+                    session_info['models'], 
+                    user_prompt, 
+                    session_info['prompt_style']
+                )
+            else:
+                st.error("Please fill in all fields before analyzing.")
+
+def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_style: int, api_key: str, system_prompt: str) -> str:
+    """Create HTML page with dual chatbots."""
+    
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Investment Advisor Comparison</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .header {{
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }}
+        .session-info {{
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }}
+        .sync-controls {{
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }}
+        .sync-input {{
+            width: 100%;
+            max-width: 600px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }}
+        .sync-button {{
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+        }}
+        .chatbots-container {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }}
+        .chatbot-panel {{
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }}
+        .chatbot-header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }}
+        .chat-messages {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }}
+        .message {{
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }}
+        .message.user {{
+            text-align: right;
+        }}
+        .message-content {{
+            display: inline-block;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            line-height: 1.5;
+        }}
+        .message.user .message-content {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }}
+        .message.bot .message-content {{
+            background: white;
+            border: 1px solid #ddd;
+        }}
+        .chat-input {{
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }}
+        .input-form {{
+            display: flex;
+            gap: 10px;
+        }}
+        .input-form input {{
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+        }}
+        .input-form button {{
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+        }}
+        .typing-indicator {{
+            display: none;
+            padding: 10px;
+            font-style: italic;
+            color: #666;
+        }}
+        .typing-indicator.active {{
+            display: block;
+        }}
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(10px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dual Investment Advisor Comparison</h1>
+            <p>Session ID: {session_id}</p>
+        </div>
+
+        <div class="session-info">
+            <h3>Session Configuration</h3>
+            <p><strong>Selected Prompt Style:</strong> {prompt_style + 1} - {"Professional" if prompt_style == 0 else "Consultative" if prompt_style == 1 else "Friendly"}</p>
+            <p><strong>System Prompt:</strong> {system_prompt}</p>
+        </div>
+
+        <div class="sync-controls">
+            <h3>Send Same Message to Both Models</h3>
+            <input type="text" id="syncInput" class="sync-input" placeholder="Enter your investment question here..." />
+            <div>
+                <button class="sync-button" onclick="sendToBoth()">Send to Both Models</button>
+            </div>
+        </div>
+
+        <div class="chatbots-container">
+            <div class="chatbot-panel">
+                <div class="chatbot-header">
+                    {model1} - Investment Advisor
+                </div>
+                <div class="chat-messages" id="chatMessages1">
+                    <div class="message bot">
+                        <div class="message-content">
+                            Hello! I'm your {model1} investment advisor. I'm ready to help you with your investment questions.
+                        </div>
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typing1">
+                    <span>Advisor is typing...</span>
+                </div>
+                <div class="chat-input">
+                    <div class="input-form">
+                        <input type="text" id="userInput1" placeholder="Ask about investments..." onkeypress="if(event.key === 'Enter') sendMessage('1')" />
+                        <button onclick="sendMessage('1')" id="sendBtn1">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chatbot-panel">
+                <div class="chatbot-header">
+                    {model2} - Investment Advisor
+                </div>
+                <div class="chat-messages" id="chatMessages2">
+                    <div class="message bot">
+                        <div class="message-content">
+                            Hello! I'm your {model2} investment advisor. I'm ready to help you with your investment questions.
+                        </div>
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typing2">
+                    <span>Advisor is typing...</span>
+                </div>
+                <div class="chat-input">
+                    <div class="input-form">
+                        <input type="text" id="userInput2" placeholder="Ask about investments..." onkeypress="if(event.key === 'Enter') sendMessage('2')" />
+                        <button onclick="sendMessage('2')" id="sendBtn2">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = '{api_key}';
+        const models = {{
+            '1': '{model1}',
+            '2': '{model2}'
+        }};
+        const systemPrompt = `{system_prompt}`;
+
+        async function sendMessage(chatbotId) {{
+            const input = document.getElementById(`userInput${{chatbotId}}`);
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            addMessage(chatbotId, message, 'user');
+            input.value = '';
+            document.getElementById(`typing${{chatbotId}}`).classList.add('active');
+            document.getElementById(`sendBtn${{chatbotId}}`).disabled = true;
+
+            try {{
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${{apiKey}}`
+                    }},
+                    body: JSON.stringify({{
+                        model: models[chatbotId],
+                        messages: [
+                            {{"role": "system", "content": systemPrompt}},
+                            {{"role": "user", "content": message}}
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 500
+                    }})
+                }});
+
+                const data = await response.json();
+                const botResponse = data.choices[0].message.content;
+                addMessage(chatbotId, botResponse, 'bot');
+
+            }} catch (error) {{
+                console.error('Error:', error);
+                addMessage(chatbotId, `Error: ${{error.message}}`, 'bot');
+            }} finally {{
+                document.getElementById(`typing${{chatbotId}}`).classList.remove('active');
+                document.getElementById(`sendBtn${{chatbotId}}`).disabled = false;
+            }}
+        }}
+
+        function sendToBoth() {{
+            const syncInput = document.getElementById('syncInput');
+            const message = syncInput.value.trim();
+            
+            if (!message) {{
+                alert('Please enter a message first');
+                return;
+            }}
+
+            document.getElementById('userInput1').value = message;
+            document.getElementById('userInput2').value = message;
+            syncInput.value = '';
+            
+            setTimeout(() => sendMessage('1'), 100);
+            setTimeout(() => sendMessage('2'), 200);
+        }}
+
+        function addMessage(chatbotId, text, sender) {{
+            const messagesContainer = document.getElementById(`chatMessages${{chatbotId}}`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${{sender}}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = text;
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }}
+    </script>
+</body>
+</html>"""
+    
+    return html_content
+
+def analyze_dual_responses(response1: str, response2: str, models: List[str], user_prompt: str, prompt_style: int):
+    """Analyze responses from dual chatbots."""
+    
+    st.header("Dual Chatbot Analysis Results")
+    
+    # Display user prompt and models
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("User Question", "Analyzed")
+    with col2:
+        st.metric("Model 1", models[0])
+    with col3:
+        st.metric("Model 2", models[1])
+    
+    st.write(f"**Question:** {user_prompt}")
+    st.write(f"**Prompt Style:** {['Professional', 'Consultative', 'Friendly'][prompt_style]}")
+    
+    # Display responses side by side
+    st.subheader("Model Responses")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write(f"**{models[0]} Response:**")
+        with st.expander(f"{models[0]} Full Response", expanded=True):
+            st.write(response1)
+    
+    with col2:
+        st.write(f"**{models[1]} Response:**")
+        with st.expander(f"{models[1]} Full Response", expanded=True):
+            st.write(response2)
+    
+    # Run evaluation
+    try:
+        # Create simplified test case for user query
+        user_test_case = TestCase(
+            id="user_query",
+            name="Real-time User Query",
+            type=TestCaseType.BASIC,
+            variables={
+                "user_query": user_prompt,
+                "prompt_style": str(prompt_style)
+            },
+            expected_elements=[
+                "investment advice",
+                "specific recommendations",
+                "risk considerations"
+            ],
+            validation_criteria={
+                "discusses_risks": True,
+                "provides_actionable_advice": True
+            },
+            difficulty=2,
+            tags=["real_time", "user_query"]
+        )
+        
+        # Initialize evaluator
+        evaluator = InvestmentModelEvaluator()
+        
+        # Evaluate both responses
+        evaluation_results = {}
+        responses = {models[0]: response1, models[1]: response2}
+        
+        for model, response in responses.items():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            result = loop.run_until_complete(
+                evaluator.evaluate_response(response, user_test_case, model)
+            )
+            
+            evaluation_results[model] = result
+            loop.close()
+        
+        # Display results
+        st.subheader("Evaluation Results")
+        
+        # Winner announcement
+        winner = max(evaluation_results.items(), key=lambda x: x[1]['overall_score'])
+        st.success(f"Winner: {winner[0]} with score {winner[1]['overall_score']:.1f}/10")
+        
+        # Create results dataframe
+        results_data = []
+        for model, result in evaluation_results.items():
+            row = {'Model': model, 'Overall Score': result['overall_score']}
+            row.update(result['scores'])
+            results_data.append(row)
+        
+        results_df = pd.DataFrame(results_data)
+        st.dataframe(results_df.round(2), use_container_width=True)
+        
+        # Visualization
+        fig = px.bar(
+            results_df,
+            x='Model',
+            y='Overall Score',
+            title="Real-Time Comparison Results",
+            color='Overall Score',
+            color_continuous_scale='viridis'
+        )
+        fig.update_layout(yaxis_range=[0, 10])
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Detailed analysis
+        st.subheader("Detailed Analysis")
+        
+        for model, result in evaluation_results.items():
+            with st.expander(f"{model} Detailed Scores"):
+                scores_data = []
+                for criterion, score in result['scores'].items():
+                    scores_data.append({'Criterion': criterion.title(), 'Score': score})
+                
+                scores_df = pd.DataFrame(scores_data)
+                fig_detail = px.bar(
+                    scores_df,
+                    x='Criterion',
+                    y='Score',
+                    title=f"{model} Score Breakdown"
+                )
+                st.plotly_chart(fig_detail, use_container_width=True)
+        
+        st.success("Analysis completed successfully!")
+        
+    except Exception as e:
+        st.error(f"Error during analysis: {str(e)}")
+
+def create_standard_comparison_interface(api_key: str):
+    """Create the standard test case comparison interface."""
     
     # Initialize components
     test_suite = InvestmentTestSuite()
@@ -1132,7 +1347,7 @@ def create_streamlit_app():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader(f"📋 {selected_test_case.name}")
+        st.subheader(f"Test Case: {selected_test_case.name}")
         st.write(f"**Type:** {selected_test_case.type.value}")
         st.write(f"**Difficulty:** {selected_test_case.difficulty}/5")
         st.write(f"**Tags:** {', '.join(selected_test_case.tags)}")
@@ -1143,7 +1358,7 @@ def create_streamlit_app():
             st.write(f"**{key.replace('_', ' ').title()}:** {value}")
     
     # Run comparison
-    if st.button("🚀 Run Model Comparison", type="primary"):
+    if st.button("Run Model Comparison", type="primary"):
         if len(selected_models) < 2:
             st.error("Select at least 2 models for comparison")
             return
@@ -1158,103 +1373,25 @@ def create_streamlit_app():
                 )
                 loop.close()
                 
-                # Display results with advanced metrics
+                # Display results
                 st.header("Comparison Results")
                 
                 # Winner announcement
                 winner_result = analysis.results[analysis.winner]
                 st.success(f"**Winner: {analysis.winner}** with score {winner_result.overall_score}/10")
                 
-                # Try to import and use advanced metrics, fallback to basic if not available
-                try:
-                    # Check if metrics_dashboard is available
-                    import importlib.util
-                    spec = importlib.util.find_spec("metrics_dashboard")
-                    
-                    if spec is not None:
-                        from metrics_dashboard import display_advanced_metrics, display_response_analysis, display_comparative_insights
-                        
-                        # Display advanced metrics dashboard
-                        display_advanced_metrics(analysis)
-                        
-                        # Response analysis
-                        display_response_analysis(analysis)
-                        
-                        # Comparative insights
-                        display_comparative_insights(analysis)
-                    else:
-                        st.info("Advanced metrics dashboard not available. Using basic visualization.")
-                        raise ImportError("metrics_dashboard not found")
-                        
-                except ImportError:
-                    # Fallback to basic metrics display
-                    st.subheader("Basic Results Display")
-                    
-                    # Summary statistics
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Mean Score", f"{analysis.summary_stats['mean_score']}/10")
-                    with col2:
-                        st.metric("Score Range", f"{analysis.summary_stats['score_range']}")
-                    with col3:
-                        st.metric("Winner Advantage", f"+{analysis.summary_stats['winner_advantage']}")
-                    with col4:
-                        st.metric("Score Std Dev", f"{analysis.summary_stats['score_std']}")
-                    
-                    # Detailed results table
-                    st.subheader("Detailed Scores")
-                    results_data = []
-                    for model, result in analysis.results.items():
-                        row = {'Model': model, 'Overall Score': result.overall_score}
-                        row.update(result.scores)
-                        results_data.append(row)
-                    
-                    results_df = pd.DataFrame(results_data)
-                    st.dataframe(results_df.round(2), use_container_width=True)
-                    
-                    # Basic visualizations
-                    st.subheader("Performance Visualizations")
-                    
-                    # Overall scores bar chart
-                    fig_bar = px.bar(
-                        results_df, 
-                        x='Model', 
-                        y='Overall Score',
-                        title="Overall Model Performance",
-                        color='Overall Score',
-                        color_continuous_scale='viridis'
-                    )
-                    fig_bar.update_layout(yaxis_range=[0, 10])
-                    st.plotly_chart(fig_bar, use_container_width=True)
-                    
-                    # Radar chart for detailed criteria
-                    criteria_cols = [col for col in results_df.columns if col not in ['Model', 'Overall Score']]
-                    
-                    fig_radar = go.Figure()
-                    for _, row in results_df.iterrows():
-                        fig_radar.add_trace(go.Scatterpolar(
-                            r=[row[col] for col in criteria_cols],
-                            theta=criteria_cols,
-                            fill='toself',
-                            name=row['Model'],
-                            opacity=0.7
-                        ))
-                    
-                    fig_radar.update_layout(
-                        polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
-                        title="Detailed Criteria Comparison"
-                    )
-                    st.plotly_chart(fig_radar, use_container_width=True)
-                    
-                    # Model responses
-                    st.subheader("Model Responses")
-                    for model, result in analysis.results.items():
-                        with st.expander(f"{model} Response (Score: {result.overall_score}/10)"):
-                            st.write(result.response)
+                # Summary statistics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Mean Score", f"{analysis.summary_stats['mean_score']}/10")
+                with col2:
+                    st.metric("Score Range", f"{analysis.summary_stats['score_range']}")
+                with col3:
+                    st.metric("Winner Advantage", f"+{analysis.summary_stats['winner_advantage']}")
+                with col4:
+                    st.metric("Score Std Dev", f"{analysis.summary_stats['score_std']}")
                 
-                st.success("✅ Model comparison completed successfully!")
-                
-                # Detailed results
+                # Detailed results table
                 st.subheader("Detailed Scores")
                 results_data = []
                 for model, result in analysis.results.items():
@@ -1265,7 +1402,7 @@ def create_streamlit_app():
                 results_df = pd.DataFrame(results_data)
                 st.dataframe(results_df.round(2), use_container_width=True)
                 
-                # Visualizations
+                # Basic visualizations
                 st.subheader("Performance Visualizations")
                 
                 # Overall scores bar chart
@@ -1304,6 +1441,8 @@ def create_streamlit_app():
                 for model, result in analysis.results.items():
                     with st.expander(f"{model} Response (Score: {result.overall_score}/10)"):
                         st.write(result.response)
+                
+                st.success("Model comparison completed successfully!")
                 
             except Exception as e:
                 st.error(f"Error running comparison: {str(e)}")

@@ -1,4 +1,322 @@
-# integrated_investment_system.py - Fixed Complete System
+def create_dual_chatbot_interface(api_key: str):
+    """Create the dual chatbot comparison interface with automatic data collection."""
+    
+    st.header("Real-Time Dual Chatbot Comparison")
+    st.markdown("Select a prompt style, launch dual chatbots, and automatically collect responses for analysis.")
+    
+    # Initialize session state for dual chatbot
+    if 'chatbot_sessions' not in st.session_state:
+        st.session_state.chatbot_sessions = {}
+    
+    # Prompt style selection
+    st.subheader("1. Select Prompt Style")
+    
+    prompt_descriptions = [
+        "Professional - Formal, comprehensive investment advice with detailed analysis",
+        "Consultative - Structured approach with bullet points and strategic recommendations", 
+        "Friendly - Conversational, approachable tone with step-by-step guidance"
+    ]
+    
+    selected_prompt_style = st.selectbox(
+        "Choose the prompt style for both models:",
+        options=[0, 1, 2],
+        format_func=lambda x: prompt_descriptions[x]
+    )
+    
+    # Show selected prompt
+    test_suite = InvestmentTestSuite()
+    
+    with st.expander("Preview Selected Prompt"):
+        st.write(test_suite.prompt_variations[selected_prompt_style])
+    
+    # Model selection
+    st.subheader("2. Model Configuration")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        model1 = st.selectbox("Model 1:", ["gpt-4o-mini", "gpt-4.1-nano"], index=0)
+    
+    with col2:
+        model2 = st.selectbox("Model 2:", ["gpt-4o-mini", "gpt-4.1-nano"], index=1)
+    
+    if model1 == model2:
+        st.error("Please select different models for comparison.")
+        return
+    
+    # Launch dual chatbots
+    st.subheader("3. Launch Dual Chatbots")
+    
+    if st.button("Launch Dual Chatbot Interface", type="primary"):
+        # Generate session ID
+        session_id = str(uuid.uuid4())[:8]
+        
+        # Create HTML content for dual chatbots
+        html_content = create_dual_chatbot_html(session_id, model1, model2, selected_prompt_style, api_key, test_suite.prompt_variations[selected_prompt_style])
+        
+        # Save to temporary file and open
+        temp_dir = tempfile.gettempdir()
+        html_file = os.path.join(temp_dir, f"dual_chatbot_{session_id}.html")
+        
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        # Store session info
+        st.session_state.current_session = {
+            'id': session_id,
+            'models': [model1, model2],
+            'prompt_style': selected_prompt_style,
+            'html_file': html_file
+        }
+        
+        # Open in browser
+        file_url = f"file://{html_file}"
+        webbrowser.open(file_url)
+        
+        st.success(f"Dual chatbot interface launched! Session ID: {session_id}")
+        st.info("The chatbot interface opened in your browser. Send the same message to both models, then click 'Auto-Send Results to Streamlit' button.")
+    
+    # Auto-collection section
+    st.subheader("4. Automatic Response Collection")
+    
+    if 'current_session' in st.session_state:
+        session_info = st.session_state.current_session
+        st.write(f"Active Session: {session_info['id']}")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Check for New Results", type="secondary"):
+                # Check API for results
+                try:
+                    import requests
+                    response = requests.get(f"http://localhost:8000/get-dual-results/{session_info['id']}")
+                    if response.status_code == 200:
+                        result_data = response.json()
+                        auto_analyze_collected_responses(result_data)
+                    else:
+                        st.info("No results found via API. Checking browser storage...")
+                        st.rerun()
+                except:
+                    st.info("API not available. Use 'Load from Browser' instead.")
+        
+        with col2:
+            if st.button("Load from Browser Storage"):
+                st.info("If automatic collection isn't working, use the 'Download Results File' button in the HTML interface, then upload the file below.")
+        
+        # File upload section
+        st.subheader("Upload Results File")
+        uploaded_file = st.file_uploader(
+            "Upload session results JSON file", 
+            type=['json'],
+            help="Download the results file from the HTML chatbot interface and upload it here"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # Read and parse JSON file
+                file_contents = uploaded_file.read()
+                result_data = json.loads(file_contents)
+                
+                st.success(f"File uploaded successfully! Session: {result_data.get('session_id', 'Unknown')}")
+                
+                # Automatically analyze the uploaded data
+                auto_analyze_collected_responses(result_data)
+                
+            except json.JSONDecodeError:
+                st.error("Invalid JSON file. Please ensure you uploaded the correct results file.")
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+    
+    # Manual input fallback
+    st.subheader("5. Manual Input (Backup)")
+    
+    with st.expander("Manual Response Entry"):
+        user_prompt_manual = st.text_input("User Question:", key="manual_prompt")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("Model 1 Response:")
+            response1_manual = st.text_area("Response 1:", height=200, key="manual_resp1")
+        
+        with col2:
+            st.write("Model 2 Response:")
+            response2_manual = st.text_area("Response 2:", height=200, key="manual_resp2")
+        
+        if st.button("Analyze Manual Responses"):
+            if user_prompt_manual and response1_manual and response2_manual:
+                manual_data = {
+                    'user_prompt': user_prompt_manual,
+                    'responses': {
+                        st.session_state.current_session['models'][0]: response1_manual,
+                        st.session_state.current_session['models'][1]: response2_manual
+                    },
+                    'models': st.session_state.current_session['models'],
+                    'prompt_style': st.session_state.current_session['prompt_style']
+                }
+                auto_analyze_collected_responses(manual_data)
+            else:
+                st.error("Please fill in all fields.")
+
+def auto_analyze_collected_responses(result_data):
+    """Automatically analyze collected responses from dual chatbot."""
+    
+    st.header("Automatic Analysis Results")
+    
+    # Display collection info
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Session", result_data.get('session_id', 'Manual'))
+    with col2:
+        st.metric("Models Compared", len(result_data.get('models', [])))
+    with col3:
+        st.metric("Prompt Style", f"Style {result_data.get('prompt_style', 0) + 1}")
+    
+    # Show collected data
+    st.subheader("Collected Data")
+    st.write(f"**User Question:** {result_data['user_prompt']}")
+    
+    # Display responses
+    col1, col2 = st.columns(2)
+    models = result_data['models']
+    responses = result_data['responses']
+    
+    with col1:
+        st.write(f"**{models[0]} Response:**")
+        with st.expander(f"{models[0]} Full Response", expanded=True):
+            st.write(responses[models[0]])
+    
+    with col2:
+        st.write(f"**{models[1]} Response:**")
+        with st.expander(f"{models[1]} Full Response", expanded=True):
+            st.write(responses[models[1]])
+    
+    # Run automatic evaluation
+    try:
+        # Create test case for user query
+        user_test_case = TestCase(
+            id="auto_collected",
+            name="Auto-Collected User Query",
+            type=TestCaseType.BASIC,
+            variables={
+                "user_query": result_data['user_prompt'],
+                "prompt_style": str(result_data['prompt_style'])
+            },
+            expected_elements=[
+                "investment advice",
+                "specific recommendations",
+                "risk considerations"
+            ],
+            validation_criteria={
+                "discusses_risks": True,
+                "provides_actionable_advice": True
+            },
+            difficulty=2,
+            tags=["auto_collected", "real_time"]
+        )
+        
+        # Initialize evaluator
+        evaluator = InvestmentModelEvaluator()
+        
+        # Evaluate both responses
+        evaluation_results = {}
+        
+        for model, response in responses.items():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            result = loop.run_until_complete(
+                evaluator.evaluate_response(response, user_test_case, model)
+            )
+            
+            evaluation_results[model] = result
+            loop.close()
+        
+        # Display results
+        st.subheader("Evaluation Results")
+        
+        # Winner announcement
+        winner = max(evaluation_results.items(), key=lambda x: x[1]['overall_score'])
+        st.success(f"Winner: {winner[0]} with score {winner[1]['overall_score']:.1f}/10")
+        
+        # Summary comparison
+        col1, col2 = st.columns(2)
+        with col1:
+            model1_score = evaluation_results[models[0]]['overall_score']
+            st.metric(f"{models[0]} Score", f"{model1_score:.1f}/10")
+        
+        with col2:
+            model2_score = evaluation_results[models[1]]['overall_score']
+            st.metric(f"{models[1]} Score", f"{model2_score:.1f}/10")
+        
+        # Detailed results table
+        results_data = []
+        for model, result in evaluation_results.items():
+            row = {'Model': model, 'Overall Score': result['overall_score']}
+            row.update(result['scores'])
+            results_data.append(row)
+        
+        results_df = pd.DataFrame(results_data)
+        
+        st.subheader("Detailed Score Breakdown")
+        st.dataframe(results_df.round(2), use_container_width=True)
+        
+        # Visualization
+        fig = px.bar(
+            results_df,
+            x='Model',
+            y='Overall Score',
+            title="Automatic Comparison Results",
+            color='Overall Score',
+            color_continuous_scale='viridis'
+        )
+        fig.update_layout(yaxis_range=[0, 10])
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Detailed criteria comparison
+        criteria_cols = [col for col in results_df.columns if col not in ['Model', 'Overall Score']]
+        
+        fig_radar = go.Figure()
+        for _, row in results_df.iterrows():
+            fig_radar.add_trace(go.Scatterpolar(
+                r=[row[col] for col in criteria_cols],
+                theta=criteria_cols,
+                fill='toself',
+                name=row['Model'],
+                opacity=0.7
+            ))
+        
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
+            title="Detailed Criteria Comparison"
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
+        
+        # Key insights
+        st.subheader("Key Insights")
+        
+        score_diff = abs(model1_score - model2_score)
+        if score_diff < 0.5:
+            st.info("The models performed very similarly on this query.")
+        elif score_diff < 1.5:
+            st.info(f"{winner[0]} had a slight advantage over the other model.")
+        else:
+            st.success(f"{winner[0]} significantly outperformed the other model.")
+        
+        # Best performing criteria
+        for model, result in evaluation_results.items():
+            best_criterion = max(result['scores'].items(), key=lambda x: x[1])
+            worst_criterion = min(result['scores'].items(), key=lambda x: x[1])
+            
+            st.write(f"**{model}:**")
+            st.write(f"- Strongest: {best_criterion[0].title()} ({best_criterion[1]:.1f}/10)")
+            st.write(f"- Needs improvement: {worst_criterion[0].title()} ({worst_criterion[1]:.1f}/10)")
+        
+        st.success("Automatic analysis completed!")
+        
+    except Exception as e:
+        st.error(f"Error during automatic analysis: {str(e)}")
+        st.info("You can still view the collected responses above.")# integrated_investment_system.py - Fixed Complete System
 import asyncio
 import json
 import re
@@ -596,7 +914,7 @@ class EnhancedModelManager:
         self.client = openai.OpenAI(api_key=api_key)
         self.available_models = {
             'gpt-4o-mini': 'gpt-4o-mini',
-            'gpt-4.1-nano': 'gpt-4.1-nano'
+            'gpt-4.1-nano': 'gpt-4.1-nano'  # Updated model name
         }
         self.test_suite = InvestmentTestSuite()
         self.evaluator = InvestmentModelEvaluator()
@@ -720,19 +1038,34 @@ async def get_test_cases():
         ]
     }
 
-@app.post("/compare-models")
-async def compare_models(request: ModelComparisonRequest):
-    """Compare models on investment test case."""
+# Enhanced API Models for dual chatbot results
+class DualChatbotResult(BaseModel):
+    session_id: str
+    user_prompt: str
+    responses: Dict[str, str]
+    models: List[str]
+    prompt_style: int
+    timestamp: str
+
+# Global storage for dual chatbot results
+dual_chatbot_results = {}
+
+@app.post("/store-dual-results")
+async def store_dual_results(result: DualChatbotResult):
+    """Store results from dual chatbot session."""
     try:
-        model_manager = EnhancedModelManager(request.api_key)
-        analysis = await model_manager.run_comparison(
-            request.models, 
-            request.test_case_id, 
-            request.prompt_variation
-        )
-        return analysis
+        dual_chatbot_results[result.session_id] = result.dict()
+        return {"status": "success", "message": "Results stored successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/get-dual-results/{session_id}")
+async def get_dual_results(session_id: str):
+    """Get results from dual chatbot session."""
+    if session_id in dual_chatbot_results:
+        return dual_chatbot_results[session_id]
+    else:
+        raise HTTPException(status_code=404, detail="Session not found")
 
 # Streamlit Application
 def create_streamlit_app():
@@ -878,7 +1211,7 @@ def create_dual_chatbot_interface(api_key: str):
                 st.error("Please fill in all fields before analyzing.")
 
 def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_style: int, api_key: str, system_prompt: str) -> str:
-    """Create HTML page with dual chatbots."""
+    """Create HTML page with dual chatbots that automatically sends results to Streamlit."""
     
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -942,6 +1275,43 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
             font-weight: bold;
             cursor: pointer;
             margin: 0 10px;
+        }}
+        .auto-send-button {{
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+        }}
+        .auto-send-button:disabled {{
+            background: #6c757d;
+            cursor: not-allowed;
+        }}
+        .download-button {{
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+        }}
+        .download-button:disabled {{
+            background: #6c757d;
+            cursor: not-allowed;
+        }}
+        .status-display {{
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 4px solid #007bff;
         }}
         .chatbots-container {{
             display: grid;
@@ -1050,6 +1420,11 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
             <input type="text" id="syncInput" class="sync-input" placeholder="Enter your investment question here..." />
             <div>
                 <button class="sync-button" onclick="sendToBoth()">Send to Both Models</button>
+                <button class="auto-send-button" id="autoSendBtn" onclick="autoSendToStreamlit()" disabled>Auto-Send Results to Streamlit</button>
+                <button class="download-button" id="downloadBtn" onclick="downloadResults()" disabled>Download Results File</button>
+            </div>
+            <div class="status-display" id="statusDisplay">
+                Status: Ready to receive your question
             </div>
         </div>
 
@@ -1101,12 +1476,49 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
     </div>
 
     <script>
+        const sessionId = '{session_id}';
         const apiKey = '{api_key}';
         const models = {{
             '1': '{model1}',
             '2': '{model2}'
         }};
         const systemPrompt = `{system_prompt}`;
+        
+        // Session state
+        let responses = {{}};
+        let userPrompt = '';
+        let responseCount = 0;
+
+        function updateStatus(message, type = 'info') {{
+            const statusDisplay = document.getElementById('statusDisplay');
+            statusDisplay.innerHTML = `Status: ${{message}}`;
+            
+            if (type === 'success') {{
+                statusDisplay.style.borderLeftColor = '#28a745';
+            }} else if (type === 'warning') {{
+                statusDisplay.style.borderLeftColor = '#ffc107';
+            }} else if (type === 'error') {{
+                statusDisplay.style.borderLeftColor = '#dc3545';
+            }} else {{
+                statusDisplay.style.borderLeftColor = '#007bff';
+            }}
+        }}
+
+        function downloadResults() {{
+            const data = localStorage.getItem(`chatbot_session_${{sessionId}}`);
+            if (data) {{
+                const blob = new Blob([data], {{type: 'application/json'}});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `session_${{sessionId}}_results.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                updateStatus('Results file downloaded! Upload this file in Streamlit for analysis.', 'success');
+            }} else {{
+                updateStatus('No session data available to download.', 'error');
+            }}
+        }}
 
         async function sendMessage(chatbotId) {{
             const input = document.getElementById(`userInput${{chatbotId}}`);
@@ -1114,10 +1526,17 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
             
             if (!message) return;
 
+            // Store user prompt if this is the first message
+            if (!userPrompt) {{
+                userPrompt = message;
+            }}
+
             addMessage(chatbotId, message, 'user');
             input.value = '';
             document.getElementById(`typing${{chatbotId}}`).classList.add('active');
             document.getElementById(`sendBtn${{chatbotId}}`).disabled = true;
+
+            updateStatus(`Getting response from ${{models[chatbotId]}}...`);
 
             try {{
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {{
@@ -1137,13 +1556,31 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
                     }})
                 }});
 
+                if (!response.ok) {{
+                    throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
+                }}
+
                 const data = await response.json();
                 const botResponse = data.choices[0].message.content;
                 addMessage(chatbotId, botResponse, 'bot');
+                
+                // Store response
+                responses[models[chatbotId]] = botResponse;
+                responseCount++;
+                
+                updateStatus(`Received response from ${{models[chatbotId]}} (${{responseCount}}/2)`, 'success');
+                
+                // Enable auto-send and download if both responses are received
+                if (responseCount === 2) {{
+                    document.getElementById('autoSendBtn').disabled = false;
+                    document.getElementById('downloadBtn').disabled = false;
+                    updateStatus('Both responses received! You can now auto-send to Streamlit or download results file.', 'success');
+                }}
 
             }} catch (error) {{
                 console.error('Error:', error);
                 addMessage(chatbotId, `Error: ${{error.message}}`, 'bot');
+                updateStatus(`Error getting response from ${{models[chatbotId]}}: ${{error.message}}`, 'error');
             }} finally {{
                 document.getElementById(`typing${{chatbotId}}`).classList.remove('active');
                 document.getElementById(`sendBtn${{chatbotId}}`).disabled = false;
@@ -1159,12 +1596,76 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
                 return;
             }}
 
+            // Reset for new conversation
+            responses = {{}};
+            responseCount = 0;
+            userPrompt = message;
+            document.getElementById('autoSendBtn').disabled = true;
+            document.getElementById('downloadBtn').disabled = true;
+
             document.getElementById('userInput1').value = message;
             document.getElementById('userInput2').value = message;
             syncInput.value = '';
             
+            updateStatus('Sending message to both models...', 'info');
+            
             setTimeout(() => sendMessage('1'), 100);
             setTimeout(() => sendMessage('2'), 200);
+        }}
+
+        async function autoSendToStreamlit() {{
+            if (Object.keys(responses).length !== 2 || !userPrompt) {{
+                alert('Need responses from both models before sending to Streamlit');
+                return;
+            }}
+
+            updateStatus('Sending results to Streamlit...', 'info');
+
+            try {{
+                // Send data to Streamlit via API
+                const payload = {{
+                    session_id: sessionId,
+                    user_prompt: userPrompt,
+                    responses: responses,
+                    models: ['{model1}', '{model2}'],
+                    prompt_style: {prompt_style},
+                    timestamp: new Date().toISOString()
+                }};
+
+                // Try to send to local Streamlit API
+                const response = await fetch('http://localhost:8000/store-dual-results', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                    }},
+                    body: JSON.stringify(payload)
+                }});
+
+                if (response.ok) {{
+                    updateStatus('Results successfully sent to Streamlit! Check the analysis tab.', 'success');
+                    
+                    // Also store in localStorage as backup
+                    localStorage.setItem(`chatbot_session_${{sessionId}}`, JSON.stringify(payload));
+                }} else {{
+                    throw new Error('Failed to send to Streamlit API');
+                }}
+
+            }} catch (error) {{
+                // Fallback to localStorage
+                console.warn('API not available, using localStorage:', error);
+                
+                const payload = {{
+                    session_id: sessionId,
+                    user_prompt: userPrompt,
+                    responses: responses,
+                    models: ['{model1}', '{model2}'],
+                    prompt_style: {prompt_style},
+                    timestamp: new Date().toISOString()
+                }};
+                
+                localStorage.setItem(`chatbot_session_${{sessionId}}`, JSON.stringify(payload));
+                updateStatus('Results stored locally. Return to Streamlit and use the "Load from Browser" option.', 'warning');
+            }}
         }}
 
         function addMessage(chatbotId, text, sender) {{
@@ -1180,6 +1681,15 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }}
+
+        // Auto-load any previous session data
+        window.addEventListener('load', function() {{
+            const savedData = localStorage.getItem(`chatbot_session_${{sessionId}}`);
+            if (savedData) {{
+                const data = JSON.parse(savedData);
+                updateStatus('Previous session data found in browser storage.', 'info');
+            }}
+        }});
     </script>
 </body>
 </html>"""

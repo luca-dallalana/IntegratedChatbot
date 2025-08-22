@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SmartInvest AI Advisor</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
     <style>
         * {
             margin: 0;
@@ -13,7 +16,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background: #f0f2f5;
             min-height: 100vh;
             color: #333;
         }
@@ -27,16 +30,13 @@
         .header {
             text-align: center;
             margin-bottom: 3rem;
-            color: white;
+            color: #333;
         }
 
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 0.5rem;
-            background: linear-gradient(45deg, #ffd89b, #19547b);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #1a1a1a;
         }
 
         .header p {
@@ -52,27 +52,27 @@
         }
 
         .investment-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: #fff;
             border-radius: 15px;
             padding: 1.5rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
         .investment-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.1);
         }
 
         .investment-card h3 {
-            color: #764ba2;
+            color: #007bff;
             margin-bottom: 1rem;
             font-size: 1.3rem;
         }
 
         .investment-card .returns {
             font-size: 1.8rem;
-            color: #667eea;
+            color: #333;
             font-weight: bold;
             margin: 0.5rem 0;
         }
@@ -117,9 +117,9 @@
         }
 
         .chat-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: #fff;
             border-radius: 20px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             height: 600px;
             display: flex;
@@ -127,7 +127,7 @@
         }
 
         .chat-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #007bff;
             color: white;
             padding: 1.5rem;
             text-align: center;
@@ -158,17 +158,6 @@
             }
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         .message.user {
             justify-content: flex-end;
         }
@@ -177,26 +166,17 @@
             max-width: 70%;
             padding: 1rem 1.5rem;
             border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
             line-height: 1.6;
         }
 
-        .message-content strong {
-            color: #764ba2;
-            font-weight: 600;
-        }
-
-        .message.user .message-content strong {
-            color: white;
-        }
-
         .message.bot .message-content {
-            background: white;
+            background: #e9e9eb;
             border-bottom-left-radius: 5px;
         }
 
         .message.user .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #007bff;
             color: white;
             border-bottom-right-radius: 5px;
         }
@@ -223,78 +203,34 @@
 
         .input-form input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #007bff;
         }
 
         .input-form button {
             padding: 1rem 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #007bff;
             color: white;
             border: none;
             border-radius: 25px;
             font-size: 1rem;
             cursor: pointer;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: background-color 0.3s ease;
         }
 
         .input-form button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .input-form button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: scale(1);
-            background: linear-gradient(135deg, #b0b0b0 0%, #888888 100%);
-        }
-
-        .typing-indicator {
-            display: none;
-            padding: 1rem;
-        }
-
-        .typing-indicator.active {
-            display: block;
-        }
-
-        .typing-indicator span {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #667eea;
-            margin: 0 2px;
-            animation: typing 1.4s infinite;
-        }
-
-        .typing-indicator span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-indicator span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-            }
-            30% {
-                transform: translateY(-10px);
-            }
+            background-color: #0056b3;
         }
 
         .api-key-section {
-            background: rgba(255, 255, 255, 0.95);
+            background: #fff;
             border-radius: 15px;
             padding: 2rem;
             margin-bottom: 2rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .api-key-section h3 {
-            color: #764ba2;
+            color: #007bff;
             margin-bottom: 1rem;
         }
 
@@ -314,95 +250,11 @@
 
         .api-key-input button {
             padding: 0.75rem 1.5rem;
-            background: #667eea;
+            background: #007bff;
             color: white;
             border: none;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-
-        .api-key-input button:hover {
-            background: #764ba2;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 10px rgba(118, 75, 162, 0.4);
-        }
-
-        .api-key-input button:active {
-            transform: translateY(0);
-        }
-
-        .api-key-status {
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-            font-weight: 500;
-        }
-
-        .api-key-status.success {
-            color: #4caf50;
-        }
-
-        .api-key-status.error {
-            color: #f44336;
-        }
-
-        .cta-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 15px;
-            text-align: center;
-            margin: 2rem 0;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            animation: slideIn 0.5s ease;
-        }
-
-        .cta-section h3 {
-            font-size: 1.8rem;
-            margin-bottom: 1rem;
-        }
-
-        .cta-section p {
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.95;
-        }
-
-        .cta-button {
-            display: inline-block;
-            padding: 1rem 3rem;
-            background: white;
-            color: #667eea;
-            text-decoration: none;
-            border-radius: 30px;
-            font-weight: bold;
-            font-size: 1.1rem;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            cursor: pointer;
-        }
-
-        .cta-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.3);
-        }
-
-        .portfolio-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: #4caf50;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-            animation: slideIn 0.5s ease;
-        }
-
-        .portfolio-badge::before {
-            content: "📈";
-            font-size: 1.2rem;
         }
     </style>
 </head>
@@ -416,10 +268,10 @@
         <div class="api-key-section">
             <h3>OpenAI API Configuration</h3>
             <div class="api-key-input">
-                <input type="password" id="apiKey" placeholder="Enter your OpenAI API key (sk-...)" onkeypress="if(event.key === 'Enter') saveApiKey()">
+                <input type="password" id="apiKey" placeholder="Enter your OpenAI API key (sk-...)">
                 <button onclick="saveApiKey()">Save Key</button>
             </div>
-            <div class="api-key-status" id="apiKeyStatus">Enter your OpenAI API key to start chatting</div>
+            <div id="apiKeyStatus" style="margin-top: 10px;"></div>
         </div>
 
         <div class="investment-types">
@@ -431,8 +283,6 @@
                     <li>✓ Diversified portfolios</li>
                     <li>✓ Index funds (S&P 500, NASDAQ)</li>
                     <li>✓ Sector-specific ETFs</li>
-                    <li>✓ Min. investment: $100</li>
-                    <li>✓ Dividend opportunities</li>
                 </ul>
             </div>
 
@@ -444,8 +294,6 @@
                     <li>✓ Bitcoin, Ethereum, Altcoins</li>
                     <li>✓ DeFi opportunities</li>
                     <li>✓ Staking rewards: 4-20% APY</li>
-                    <li>✓ 24/7 trading</li>
-                    <li>✓ Min. investment: $50</li>
                 </ul>
             </div>
 
@@ -457,8 +305,6 @@
                     <li>✓ Government bonds</li>
                     <li>✓ Corporate bonds</li>
                     <li>✓ Municipal bonds (tax-free)</li>
-                    <li>✓ Fixed income stream</li>
-                    <li>✓ Min. investment: $1,000</li>
                 </ul>
             </div>
 
@@ -470,8 +316,6 @@
                     <li>✓ Real estate exposure</li>
                     <li>✓ Monthly dividends available</li>
                     <li>✓ Commercial & residential</li>
-                    <li>✓ High liquidity</li>
-                    <li>✓ Min. investment: $500</li>
                 </ul>
             </div>
         </div>
@@ -479,214 +323,64 @@
         <div class="chat-container">
             <div class="chat-header">
                 <h2>Chat with Your Investment Advisor</h2>
-                <p>Let's build your personalized investment strategy</p>
             </div>
 
             <div class="chat-messages" id="chatMessages">
                 <div class="message bot">
                     <div class="message-content">
-                        Hello! I'm your SmartInvest AI Advisor. I'm here to help you navigate the world of investments and build a portfolio that matches your goals. 📈<br><br>
-                        Whether you're interested in stocks, ETFs, cryptocurrency, bonds, or other investment options, I can help you understand the risks and opportunities. What brings you here today - are you new to investing or looking to optimize your existing portfolio?
+                        Hello! I'm your SmartInvest AI Advisor. How can I help you with your investments today?
                     </div>
                 </div>
             </div>
 
-            <div class="typing-indicator" id="typingIndicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-
             <div class="chat-input">
-                <form class="input-form" onsubmit="sendMessage(event); return false;">
-                    <input type="text" id="userInput" placeholder="Ask about stocks, crypto, ETFs, bonds, or investment strategies..." autocomplete="off">
+                <form class="input-form" onsubmit="sendMessage(event)">
+                    <input type="text" id="userInput" placeholder="Ask about stocks, crypto, ETFs, bonds..." autocomplete="off">
                     <button type="submit" id="sendButton">Send</button>
                 </form>
             </div>
         </div>
-
-        <div class="cta-section" id="ctaSection" style="display: none;">
-            <h3>🎯 Ready to Start Investing!</h3>
-            <p>Based on our conversation, we've identified the perfect investment strategy for your goals</p>
-            <a href="#" class="cta-button" onclick="scheduleConsultation(); return false;">Get Your Free Portfolio Analysis</a>
-        </div>
     </div>
 
     <script>
-        // Investment Rules and Logic
-        const investmentRules = {
-            conservative: {
-                allocation: { bonds: 60, stocks: 30, alternatives: 10 },
-                riskTolerance: 'low',
-                expectedReturn: '3-5%',
-                timeHorizon: '1-3 years',
-                suitable: ['bonds', 'dividend stocks', 'blue-chip ETFs']
-            },
-            moderate: {
-                allocation: { stocks: 50, bonds: 30, alternatives: 20 },
-                riskTolerance: 'medium',
-                expectedReturn: '6-8%',
-                timeHorizon: '3-7 years',
-                suitable: ['balanced funds', 'REITs', 'index ETFs', 'some crypto']
-            },
-            aggressive: {
-                allocation: { stocks: 70, alternatives: 25, bonds: 5 },
-                riskTolerance: 'high',
-                expectedReturn: '10-15%',
-                timeHorizon: '7+ years',
-                suitable: ['growth stocks', 'crypto', 'sector ETFs', 'emerging markets']
-            }
-        };
-
-        // Enhanced system prompt with investment focus
-        const systemPrompt = `You are an expert investment advisor AI assistant for SmartInvest. Your role is to help clients understand various investment options including stocks, ETFs, cryptocurrency, bonds, REITs, and other investment vehicles. Guide qualified prospects toward scheduling a free portfolio consultation.
+        const systemPrompt = `You are an expert investment advisor AI assistant for SmartInvest. Your role is to help clients understand various investment options including stocks, ETFs, cryptocurrency, bonds, REITs, and other investment vehicles.
 
 IMPORTANT INSTRUCTIONS:
-- Keep responses concise and conversational (2-3 paragraphs max)
-- Use short bullet points when listing investment options
-- Include relevant market insights when appropriate
-- Focus on education and building trust
-- Never provide specific financial advice or guarantee returns
-- Always include appropriate risk disclaimers
-
-INVESTMENT PRODUCTS YOU CAN DISCUSS:
-
-1. STOCKS & ETFs:
-   - Index funds (S&P 500, NASDAQ, Russell 2000)
-   - Sector ETFs (Technology, Healthcare, Energy, etc.)
-   - Individual stocks (blue-chip, growth, dividend)
-   - International markets
-   - Average returns: 8-12% historically
-   - Risk level: Medium to High
-
-2. CRYPTOCURRENCY:
-   - Bitcoin (BTC) - Digital gold, store of value
-   - Ethereum (ETH) - Smart contracts platform
-   - Stablecoins (USDC, USDT) - Pegged to USD
-   - DeFi protocols - Yield farming, liquidity providing
-   - Staking opportunities: 4-20% APY
-   - Risk level: High
-   - Volatility: Extreme
-
-3. BONDS:
-   - Treasury bonds (T-bills, T-notes, T-bonds)
-   - Corporate bonds (Investment grade, High yield)
-   - Municipal bonds (Tax-free income)
-   - International bonds
-   - Yields: 3-5% for safe bonds, 6-8% for high yield
-   - Risk level: Low to Medium
-
-4. REITs (Real Estate Investment Trusts):
-   - Commercial REITs (Office, Retail, Industrial)
-   - Residential REITs (Apartments, Single-family)
-   - Healthcare REITs (Hospitals, Senior care)
-   - Dividend yields: 4-8% typically
-   - Risk level: Medium
-
-5. ALTERNATIVE INVESTMENTS:
-   - Commodities (Gold, Silver, Oil)
-   - Peer-to-peer lending
-   - Crowdfunded real estate
-   - Art and collectibles
-   - Risk level: Varies
-
-QUALIFICATION SIGNALS (When to mark as qualified):
-Include [QUALIFIED] in your response when the user:
-- Has $1,000+ to invest (or indicates available funds)
-- Shows understanding of risk tolerance
-- Has investment timeline of 1+ years
-- Asks about specific investment strategies
-- Expresses readiness to start investing
-- Inquires about portfolio allocation
-- Asks about opening an investment account
-
-CONVERSATION FLOW:
-1. Welcome: Understand their investment experience and goals
-2. Discovery: Learn about risk tolerance, timeline, and capital
-3. Education: Explain suitable investment options based on their profile
-4. Risk Assessment: Ensure they understand risks and rewards
-5. Strategy: Suggest appropriate portfolio allocation
-6. Next Steps: If qualified, offer free portfolio consultation
-
-KEY EDUCATIONAL POINTS:
-- Diversification reduces risk
-- Time in market beats timing the market
-- Dollar-cost averaging for volatile assets
-- Compound interest is powerful over time
-- Tax-advantaged accounts (IRA, 401k) benefits
-- Importance of emergency fund before investing
-- Risk vs. reward relationship
-
-COMPLIANCE REMINDERS:
-- Never guarantee specific returns
-- Always mention that past performance doesn't guarantee future results
-- Remind users that all investments carry risk
-- Suggest consulting with a licensed financial advisor for personalized advice
-- Mention that crypto is highly volatile and speculative
-
-OBJECTION HANDLING:
-- "Too risky" → "Let's explore lower-risk options like bonds or dividend stocks that match your comfort level"
-- "Not enough money" → "You can start with as little as $100 in ETFs or $50 in crypto. Let me show you how"
-- "Bad timing" → "Dollar-cost averaging helps reduce timing risk. You invest small amounts regularly"
-- "Don't understand" → "That's perfectly normal! Let's start with the basics and build from there"
-
-CLOSING APPROACHES:
-- "Based on your goals and risk tolerance, I'd recommend exploring [specific strategy]. Would you like a free portfolio analysis?"
-- "You seem ready to start building wealth. Should we schedule a consultation to create your personalized investment plan?"
-- "Many of our clients with similar profiles see [return range] annually. Shall we discuss your specific situation?"
-
-Remember: The goal is to educate, build trust, and help clients make informed investment decisions. Be transparent about risks while highlighting opportunities.`;
+- Keep responses concise and conversational.
+- Use markdown for formatting.
+- Never provide specific financial advice or guarantee returns.
+- Always include appropriate risk disclaimers.`;
 
         let apiKey = localStorage.getItem('openai_api_key') || '';
         let conversationHistory = [
             { role: 'system', content: systemPrompt }
         ];
-        let isQualifiedLead = false;
-        
-        // Check if API key exists on load
+
         window.addEventListener('DOMContentLoaded', function() {
             if (apiKey) {
-                document.getElementById('apiKeyStatus').textContent = '✓ API key loaded from storage';
-                document.getElementById('apiKeyStatus').className = 'api-key-status success';
-                document.querySelector('.api-key-section').classList.remove('warning');
+                document.getElementById('apiKeyStatus').textContent = 'API key loaded from storage.';
             } else {
-                document.querySelector('.api-key-section').classList.add('warning');
-                document.getElementById('apiKeyStatus').textContent = 'Enter your OpenAI API key to start chatting';
-                document.getElementById('apiKeyStatus').className = 'api-key-status';
+                document.getElementById('apiKeyStatus').textContent = 'Please enter your OpenAI API key.';
             }
         });
 
         function saveApiKey() {
             const keyInput = document.getElementById('apiKey');
-            const status = document.getElementById('apiKeyStatus');
-            
             if (keyInput.value.trim()) {
                 apiKey = keyInput.value.trim();
                 localStorage.setItem('openai_api_key', apiKey);
-                status.textContent = '✓ API key saved successfully!';
-                status.className = 'api-key-status success';
-                document.querySelector('.api-key-section').classList.remove('warning');
-                keyInput.value = '';
-                
-                // Show success animation
-                status.style.animation = 'fadeIn 0.5s ease';
+                document.getElementById('apiKeyStatus').textContent = 'API key saved successfully!';
             } else {
-                status.textContent = '✗ Please enter a valid API key';
-                status.className = 'api-key-status error';
-                status.style.animation = 'fadeIn 0.5s ease';
+                document.getElementById('apiKeyStatus').textContent = 'Please enter a valid API key.';
             }
         }
 
         async function sendMessage(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
+            event.preventDefault();
             
             if (!apiKey) {
                 alert('Please enter your OpenAI API key first');
-                document.getElementById('apiKey').focus();
-                return false;
+                return;
             }
 
             const input = document.getElementById('userInput');
@@ -694,29 +388,10 @@ Remember: The goal is to educate, build trust, and help clients make informed in
             
             if (!message) return;
 
-            // Add user message
             addMessage(message, 'user');
             input.value = '';
 
-            // Show typing indicator
-            const typingIndicator = document.getElementById('typingIndicator');
-            typingIndicator.classList.add('active');
-
-            // Disable send button and show loading state
-            const sendButton = document.getElementById('sendButton');
-            sendButton.disabled = true;
-            sendButton.textContent = 'Sending...';
-
-            // Add user message to history
             conversationHistory.push({ role: 'user', content: message });
-
-            // Keep conversation history a reasonable size (last 10 exchanges)
-            if (conversationHistory.length > 21) { // 1 system prompt + 10 user/assistant pairs
-                conversationHistory = [
-                    conversationHistory[0], // Keep system prompt
-                    ...conversationHistory.slice(-20) // Keep the last 10 pairs of messages
-                ];
-            }
 
             try {
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -734,53 +409,18 @@ Remember: The goal is to educate, build trust, and help clients make informed in
                 });
 
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('Invalid API key. Please check your OpenAI API key.');
-                    } else if (response.status === 429) {
-                        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-                    } else {
-                        throw new Error(`API request failed: ${response.status}`);
-                    }
+                    throw new Error(`API request failed: ${response.status}`);
                 }
 
                 const data = await response.json();
                 const botResponse = data.choices[0].message.content;
                 
-                // Check if the response contains qualification signal
-                if (botResponse.includes('[QUALIFIED]')) {
-                    isQualifiedLead = true;
-                    // Remove the [QUALIFIED] tag from the visible response
-                    const cleanResponse = botResponse.replace('[QUALIFIED]', '').trim();
-                    
-                    // Add bot response to history with clean version
-                    conversationHistory.push({ role: 'assistant', content: cleanResponse });
-                    
-                    // Add bot response to UI
-                    addMessage(cleanResponse, 'bot');
-                    
-                    // Show CTA section with animation after a short delay
-                    setTimeout(() => {
-                        const ctaSection = document.getElementById('ctaSection');
-                        ctaSection.style.display = 'block';
-                        ctaSection.style.animation = 'fadeIn 0.5s ease';
-                        ctaSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 1000);
-                } else {
-                    // Add bot response to history
-                    conversationHistory.push({ role: 'assistant', content: botResponse });
-                    
-                    // Add bot response to UI
-                    addMessage(botResponse, 'bot');
-                }
+                conversationHistory.push({ role: 'assistant', content: botResponse });
+                addMessage(botResponse, 'bot');
 
             } catch (error) {
                 console.error('Error:', error);
-                addMessage(`I apologize, but I encountered an error. ${error.message}`, 'bot');
-            } finally {
-                // Hide typing indicator and enable send button
-                typingIndicator.classList.remove('active');
-                sendButton.disabled = false;
-                sendButton.textContent = 'Send';
+                addMessage(`An error occurred: ${error.message}`, 'bot');
             }
         }
 
@@ -792,19 +432,9 @@ Remember: The goal is to educate, build trust, and help clients make informed in
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            // Convert markdown to HTML for bot messages
             if (sender === 'bot') {
-                // Convert markdown bold to HTML
-                let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                // Convert markdown bullet points to HTML list items
-                formattedText = formattedText.replace(/-\s(.*?)(?=\n-|\n\n|$)/g, '<li>$1</li>');
-                if (formattedText.includes('<li>')) {
-                    formattedText = `<ul>${formattedText}</ul>`.replace(/<\/li>(\s*?)<ul>/g, '</li></ul><br><ul>');
-                }
-                // Add line breaks for better readability
-                formattedText = formattedText.replace(/\n\n/g, '<br><br>');
-                formattedText = formattedText.replace(/\n/g, '<br>');
-                contentDiv.innerHTML = formattedText;
+                contentDiv.innerHTML = marked.parse(text);
+                hljs.highlightAll();
             } else {
                 contentDiv.textContent = text;
             }
@@ -812,21 +442,7 @@ Remember: The goal is to educate, build trust, and help clients make informed in
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
             
-            // Scroll to bottom
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function scheduleConsultation() {
-            addMessage("I'd like to get my free portfolio analysis!", 'user');
-            
-            // Show typing indicator
-            const typingIndicator = document.getElementById('typingIndicator');
-            typingIndicator.classList.add('active');
-            
-            setTimeout(() => {
-                typingIndicator.classList.remove('active');
-                addMessage("Excellent decision! 🎯 I'm excited to help you start your investment journey. Our portfolio analysts can create a personalized investment strategy based on your goals and risk tolerance.<br><br>The consultation includes:<br>• Risk assessment and profiling<br>• Portfolio allocation recommendations<br>• Tax-optimization strategies<br>• Specific investment suggestions<br><br>To schedule your free consultation, please call <strong>1-800-SMARTINVEST</strong> or I can have an advisor contact you. What's the best phone number and time to reach you?", 'bot');
-            }, 1500);
         }
     </script>
 </body>

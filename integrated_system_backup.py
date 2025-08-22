@@ -1,4 +1,5 @@
 # integrated_investment_system_enhanced.py - Complete System with Metrics Dashboard
+# Sem langsmith mas com metricas avançadas e chatbot mais estetico
 import asyncio
 import json
 import re
@@ -31,11 +32,6 @@ from metrics_dashboard import (
     display_response_analysis,
     display_comparative_insights
 )
-
-# LangSmith Integration
-from langsmith import Client
-from langsmith.evaluation import evaluate
-from langsmith.schemas import Run, Example
 
 # Test Suite Classes
 class TestCaseType(Enum):
@@ -194,94 +190,6 @@ class InvestmentTestSuite:
             
             "Hi there! I'm excited to help you with your investments. I'll walk you through potential strategies, explain how different asset classes fit, and outline what steps we should take to move forward."
         ]
-
-# LangSmith Integration Class
-class LangSmithIntegration:
-    """Integration layer for LangSmith evaluation and monitoring."""
-    
-    def __init__(self, api_key: Optional[str] = None, project_name: str = "investment-chatbot-comparison"):
-        if api_key:
-            os.environ["LANGSMITH_API_KEY"] = api_key
-        
-        if not os.environ.get("LANGSMITH_API_KEY"):
-            raise ValueError("LangSmith API key not provided. Set LANGSMITH_API_KEY environment variable or pass api_key parameter.")
-        
-        self.client = Client()
-        self.project_name = project_name
-        self._setup_project()
-        
-        self.evaluation_criteria = {
-            "investment_accuracy": {
-                "description": "Evaluates factual accuracy of investment advice",
-                "weight": 0.25
-            },
-            "risk_disclosure": {
-                "description": "Checks if risks are properly disclosed",
-                "weight": 0.20
-            },
-            "regulatory_compliance": {
-                "description": "Verifies compliance with financial advisory standards",
-                "weight": 0.15
-            },
-            "personalization": {
-                "description": "Assesses how well advice is tailored to client profile",
-                "weight": 0.15
-            },
-            "actionability": {
-                "description": "Evaluates if advice is clear and actionable",
-                "weight": 0.15
-            },
-            "clarity": {
-                "description": "Measures clarity and understandability",
-                "weight": 0.10
-            }
-        }
-    
-    def _setup_project(self):
-        try:
-            os.environ["LANGCHAIN_PROJECT"] = self.project_name
-            os.environ["LANGCHAIN_TRACING_V2"] = "true"
-        except Exception as e:
-            print(f"Warning: Could not set up LangSmith project: {e}")
-    
-    async def log_comparison_run(self, 
-                                 model_name: str,
-                                 prompt: str,
-                                 response: str,
-                                 test_case: Dict,
-                                 evaluation_scores: Dict,
-                                 run_metadata: Optional[Dict] = None) -> str:
-        run_id = str(uuid.uuid4())
-        
-        try:
-            metadata = {
-                "model": model_name,
-                "test_case_id": test_case.get("id", ""),
-                "test_case_name": test_case.get("name", ""),
-                "difficulty": test_case.get("difficulty", 1),
-                "timestamp": datetime.now().isoformat(),
-                **(run_metadata or {})
-            }
-            
-            self.client.create_run(
-                name=f"{model_name}-{test_case.get('id', 'unknown')}",
-                run_type="llm",
-                inputs={"prompt": prompt, "client_profile": test_case.get("variables", {})
-                },
-                outputs={"response": response},
-                extra={
-                    "metadata": metadata,
-                    "evaluation_scores": evaluation_scores
-                },
-                project_name=self.project_name,
-                id=run_id
-            )
-            
-            return run_id
-            
-        except Exception as e:
-            print(f"Error logging run to LangSmith: {e}")
-            return None
 
 # Enhanced Model Evaluator with Advanced Scoring
 class InvestmentModelEvaluator:
@@ -715,7 +623,7 @@ class EnhancedModelManager:
             return f"Error with {model_name}: {str(e)}"
     
     async def run_comparison(self, models: List[str], test_case_id: str, 
-                           prompt_variation: int = 0, langsmith_client: Optional[LangSmithIntegration] = None) -> ComparisonAnalysis:
+                           prompt_variation: int = 0) -> ComparisonAnalysis:
         """Run comprehensive model comparison on investment test case."""
         
         # Get test case
@@ -749,15 +657,6 @@ class EnhancedModelManager:
                 timestamp=datetime.now().isoformat(),
                 metrics=evaluation_result.get('metrics')
             )
-
-            if langsmith_client:
-                await langsmith_client.log_comparison_run(
-                    model_name=model,
-                    prompt=formatted_prompt,
-                    response=response,
-                    test_case=test_case.__dict__,
-                    evaluation_scores=evaluation_result['scores']
-                )
         
         # Find winner
         winner = max(results.items(), key=lambda x: x[1].overall_score)[0]
@@ -792,7 +691,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Enhanced API Models for dual chatbot results
@@ -890,7 +789,7 @@ def export_results_to_csv(analysis_results):
         mime="text/csv"
     )
 
-def create_dual_chatbot_interface(api_key: str, langsmith_client: Optional[LangSmithIntegration] = None):
+def create_dual_chatbot_interface(api_key: str):
     """Create the dual chatbot comparison interface with automatic data collection."""
     
     st.header("Real-Time Dual Chatbot Comparison")
@@ -984,7 +883,7 @@ def create_dual_chatbot_interface(api_key: str, langsmith_client: Optional[LangS
                     response = requests.get(f"http://localhost:8000/get-dual-results/{session_info['id']}")
                     if response.status_code == 200:
                         result_data = response.json()
-                        auto_analyze_collected_responses(result_data, langsmith_client)
+                        auto_analyze_collected_responses(result_data)
                     else:
                         st.info("No results found via API. Checking browser storage...")
                         st.rerun()
@@ -1012,7 +911,7 @@ def create_dual_chatbot_interface(api_key: str, langsmith_client: Optional[LangS
                 st.success(f"File uploaded successfully! Session: {result_data.get('session_id', 'Unknown')}")
                 
                 # Automatically analyze the uploaded data
-                auto_analyze_collected_responses(result_data, langsmith_client)
+                auto_analyze_collected_responses(result_data)
                 
             except json.JSONDecodeError:
                 st.error("Invalid JSON file. Please ensure you uploaded the correct results file.")
@@ -1046,11 +945,11 @@ def create_dual_chatbot_interface(api_key: str, langsmith_client: Optional[LangS
                     'models': st.session_state.current_session['models'],
                     'prompt_style': st.session_state.current_session['prompt_style']
                 }
-                auto_analyze_collected_responses(manual_data, langsmith_client)
+                auto_analyze_collected_responses(manual_data)
             else:
                 st.error("Please fill in all fields.")
 
-def auto_analyze_collected_responses(result_data, langsmith_client: Optional[LangSmithIntegration] = None):
+def auto_analyze_collected_responses(result_data):
     """Automatically analyze collected responses from dual chatbot and store in session state."""
     
     st.header("Automatic Analysis Results")
@@ -1123,18 +1022,6 @@ def auto_analyze_collected_responses(result_data, langsmith_client: Optional[Lan
             
             evaluation_results[model] = result
             loop.close()
-
-            if langsmith_client:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(langsmith_client.log_comparison_run(
-                    model_name=model,
-                    prompt=result_data['user_prompt'],
-                    response=response,
-                    test_case=user_test_case.__dict__,
-                    evaluation_scores=result['scores']
-                ))
-                loop.close()
         
         # Create ComparisonAnalysis object for metrics dashboard
         results_dict = {}
@@ -1466,9 +1353,14 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
 </html>"""
 
 def display_comparison_results(analysis):
+    """Display basic comparison results."""
     st.header("Comparison Results")
+    
+    # Winner announcement
     winner_result = analysis.results[analysis.winner]
     st.success(f"**Winner: {analysis.winner}** with score {winner_result.overall_score}/10")
+    
+    # Summary statistics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Mean Score", f"{analysis.summary_stats['mean_score']}/10")
@@ -1478,15 +1370,22 @@ def display_comparison_results(analysis):
         st.metric("Winner Advantage", f"+{analysis.summary_stats['winner_advantage']}")
     with col4:
         st.metric("Score Std Dev", f"{analysis.summary_stats['score_std']}")
+    
+    # Detailed results table
     st.subheader("Detailed Scores")
     results_data = []
     for model, result in analysis.results.items():
         row = {'Model': model, 'Overall Score': result.overall_score}
         row.update(result.scores)
         results_data.append(row)
+    
     results_df = pd.DataFrame(results_data)
     st.dataframe(results_df.round(2), use_container_width=True)
+    
+    # Basic visualizations
     st.subheader("Performance Visualizations")
+    
+    # Overall scores bar chart
     fig_bar = px.bar(
         results_df, 
         x='Model', 
@@ -1497,7 +1396,10 @@ def display_comparison_results(analysis):
     )
     fig_bar.update_layout(yaxis_range=[0, 10])
     st.plotly_chart(fig_bar, use_container_width=True)
+    
+    # Radar chart for detailed criteria
     criteria_cols = [col for col in results_df.columns if col not in ['Model', 'Overall Score']]
+    
     fig_radar = go.Figure()
     for _, row in results_df.iterrows():
         fig_radar.add_trace(go.Scatterpolar(
@@ -1507,17 +1409,20 @@ def display_comparison_results(analysis):
             name=row['Model'],
             opacity=0.7
         ))
+    
     fig_radar.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
         title="Detailed Criteria Comparison"
     )
     st.plotly_chart(fig_radar, use_container_width=True)
+    
+    # Model responses
     st.subheader("Model Responses")
     for model, result in analysis.results.items():
         with st.expander(f"{model} Response (Score: {result.overall_score}/10)"):
             st.write(result.response)
 
-def create_standard_comparison_interface(api_key: str, langsmith_client: Optional[LangSmithIntegration] = None):
+def create_standard_comparison_interface(api_key: str):
     """Create the standard test case comparison interface with metrics integration."""
     
     # Initialize components
@@ -1578,7 +1483,7 @@ def create_standard_comparison_interface(api_key: str, langsmith_client: Optiona
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     analysis = loop.run_until_complete(
-                        model_manager.run_comparison(selected_models, selected_test_id, prompt_variation, langsmith_client)
+                        model_manager.run_comparison(selected_models, selected_test_id, prompt_variation)
                     )
                     loop.close()
                     
@@ -1601,46 +1506,6 @@ def create_standard_comparison_interface(api_key: str, langsmith_client: Optiona
                 st.rerun()
             else:
                 st.warning("Run a comparison first to generate metrics")
-
-def integrate_langsmith_with_streamlit(st_component):
-    """Add LangSmith integration controls to Streamlit sidebar."""
-    st_component.subheader("LangSmith Integration")
-    
-    # LangSmith API key input
-    langsmith_api_key = st_component.text_input(
-        "LangSmith API Key",
-        type="password",
-        help="Enter your LangSmith API key for advanced evaluation tracking"
-    )
-    
-    # Enable/disable LangSmith
-    use_langsmith = st_component.checkbox(
-        "Enable LangSmith Tracking",
-        value=False,
-        help="Send evaluation data to LangSmith for organizing evaluations"
-    )
-    
-    if use_langsmith and langsmith_api_key:
-        # Project name configuration
-        project_name = st_component.text_input(
-            "LangSmith Project Name",
-            value="investment-chatbot-comparison",
-            help="Name of the LangSmith project for organizing evaluations"
-        )
-        
-        # Initialize LangSmith integration
-        try:
-            langsmith = LangSmithIntegration(
-                api_key=langsmith_api_key,
-                project_name=project_name
-            )
-            st_component.success("✅ LangSmith connected")
-            return langsmith
-        except Exception as e:
-            st.error(f"❌ LangSmith connection failed: {e}")
-            return None
-    
-    return None
 
 def create_streamlit_app():
     """Create enhanced Streamlit application with metrics dashboard."""
@@ -1665,8 +1530,6 @@ def create_streamlit_app():
     st.sidebar.header("Configuration")
     api_key = st.sidebar.text_input("OpenAI API Key", type="password")
     
-    langsmith_client = integrate_langsmith_with_streamlit(st.sidebar)
-
     if not api_key and page != "Metrics Dashboard":
         st.warning("Enter your OpenAI API key to begin")
         return
@@ -1678,9 +1541,9 @@ def create_streamlit_app():
     if page == "Metrics Dashboard":
         display_metrics_dashboard()
     elif page == "Real-Time Dual Chatbot":
-        create_dual_chatbot_interface(api_key, langsmith_client)
+        create_dual_chatbot_interface(api_key)
     else:
-        create_standard_comparison_interface(api_key, langsmith_client)
+        create_standard_comparison_interface(api_key)
 
 # Main execution function
 def main():

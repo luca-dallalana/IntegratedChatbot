@@ -1,4 +1,5 @@
 # integrated_investment_system_enhanced.py - Complete System with Metrics Dashboard
+# Com langsmith mas falhando na hora de criar chatbot
 import asyncio
 import json
 import re
@@ -445,9 +446,9 @@ class InvestmentModelEvaluator:
         # Check for specific details vs. generic advice
         specific_indicators = [
             r'\$[\\d,]+',  # Dollar amounts
-            r'\d+\.?\d*\s*%',  # Percentages
-            r'\d+\s+days?',  # Time periods
-            r'\d+\s+years?',  # Years
+            r'\\\d+\\.?\\d*\\s*%',  # Percentages
+            r'\\\d+\\s+days?',  # Time periods
+            r'\\\d+\\s+years?',  # Years
             'specific', 'exactly', 'precisely'
         ]
         
@@ -517,7 +518,7 @@ class InvestmentModelEvaluator:
             "has_conclusion": len(paragraphs) > 1 and any(word in paragraphs[-1].lower() 
                                                         for word in ['summary', 'conclusion', 'overall', 'finally']),
             "has_bullet_points": '•' in text or re.search(r'^\s*[-*]\s', text, re.MULTILINE),
-            "has_numbered_list": re.search(r'^\s*\d+\.', text, re.MULTILINE),
+            "has_numbered_list": re.search(r'^\s*\\d+\.', text, re.MULTILINE),
             "paragraph_count": len(paragraphs),
             "paragraph_balance": "balanced" if 2 <= len(paragraphs) <= 5 else "unbalanced"
         }
@@ -792,7 +793,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 # Enhanced API Models for dual chatbot results
@@ -1348,7 +1349,7 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
 
     <script>
         const session_id = "{session_id}";
-        const models = ["{model1}", "{model2}"];
+        const models = ["{models[0]}", "{models[1]}"];
         const prompt_style = {prompt_style};
         const api_key = "{api_key}";
         const system_prompt = `{system_prompt}`;
@@ -1466,9 +1467,14 @@ def create_dual_chatbot_html(session_id: str, model1: str, model2: str, prompt_s
 </html>"""
 
 def display_comparison_results(analysis):
+    """Display basic comparison results."""
     st.header("Comparison Results")
+    
+    # Winner announcement
     winner_result = analysis.results[analysis.winner]
     st.success(f"**Winner: {analysis.winner}** with score {winner_result.overall_score}/10")
+    
+    # Summary statistics
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Mean Score", f"{analysis.summary_stats['mean_score']}/10")
@@ -1478,15 +1484,22 @@ def display_comparison_results(analysis):
         st.metric("Winner Advantage", f"+{analysis.summary_stats['winner_advantage']}")
     with col4:
         st.metric("Score Std Dev", f"{analysis.summary_stats['score_std']}")
+    
+    # Detailed results table
     st.subheader("Detailed Scores")
     results_data = []
     for model, result in analysis.results.items():
         row = {'Model': model, 'Overall Score': result.overall_score}
         row.update(result.scores)
         results_data.append(row)
+    
     results_df = pd.DataFrame(results_data)
     st.dataframe(results_df.round(2), use_container_width=True)
+    
+    # Basic visualizations
     st.subheader("Performance Visualizations")
+    
+    # Overall scores bar chart
     fig_bar = px.bar(
         results_df, 
         x='Model', 
@@ -1497,7 +1510,10 @@ def display_comparison_results(analysis):
     )
     fig_bar.update_layout(yaxis_range=[0, 10])
     st.plotly_chart(fig_bar, use_container_width=True)
+    
+    # Radar chart for detailed criteria
     criteria_cols = [col for col in results_df.columns if col not in ['Model', 'Overall Score']]
+    
     fig_radar = go.Figure()
     for _, row in results_df.iterrows():
         fig_radar.add_trace(go.Scatterpolar(
@@ -1507,11 +1523,14 @@ def display_comparison_results(analysis):
             name=row['Model'],
             opacity=0.7
         ))
+    
     fig_radar.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 10])),
         title="Detailed Criteria Comparison"
     )
     st.plotly_chart(fig_radar, use_container_width=True)
+    
+    # Model responses
     st.subheader("Model Responses")
     for model, result in analysis.results.items():
         with st.expander(f"{model} Response (Score: {result.overall_score}/10)"):
